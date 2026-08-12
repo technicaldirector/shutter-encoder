@@ -41,10 +41,24 @@ jobs:
           "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "25"
+
+      # Self-signed code-signing certificate. This is free and gives the exe an actual
+      # Authenticode signature (helps with some AV heuristics that flag unsigned binaries),
+      # but it does NOT establish a trust chain, so Windows SmartScreen will still show an
+      # "unknown publisher" prompt - only a CA-issued certificate removes that. A real,
+      # zero-cost path to that exists via the SignPath Foundation's free signing program for
+      # qualifying open-source projects (signpath.io/product/open-source), worth pursuing
+      # separately if the SmartScreen prompt itself needs to go away.
+      - name: Create self-signed code-signing certificate
+        id: cert
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigning -Subject "CN=Shutter Encoder (community build, unsigned by original author)" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(3)
+          "thumbprint=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       # jpackage's --type exe needs WiX Toolset. windows-latest runners are
       # documented to include it, but installing defensively here costs
@@ -260,6 +274,13 @@ jobs:
           Copy-Item fonts/*.ttf "$appImage/runtime/lib/fonts/"
           Copy-Item fonts/*.otf "$appImage/runtime/lib/fonts/" -ErrorAction SilentlyContinue
 
+      - name: Sign app executable (self-signed)
+        shell: pwsh
+        run: |
+          $cert = Get-Item "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}"
+          $sig = Set-AuthenticodeSignature -FilePath "pkg_out/Shutter Encoder/Shutter Encoder.exe" -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+          Write-Host "Signature status: $($sig.Status)"
+
       - name: jpackage - build EXE installer
         shell: pwsh
         run: |
@@ -275,6 +296,15 @@ jobs:
             --win-dir-chooser `
             --win-menu `
             --win-shortcut
+
+      - name: Sign installer (self-signed)
+        shell: pwsh
+        run: |
+          $cert = Get-Item "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}"
+          Get-ChildItem installer_out/*.exe | ForEach-Object {
+              $sig = Set-AuthenticodeSignature -FilePath $_.FullName -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+              Write-Host "$($_.Name): $($sig.Status)"
+          }
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
