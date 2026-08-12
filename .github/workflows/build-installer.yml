@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Determine version
         id: version
@@ -277,9 +277,26 @@ jobs:
       - name: Sign app executable (self-signed)
         shell: pwsh
         run: |
+          # Windows Defender's real-time scan briefly locks freshly-written exes to scan
+          # them, which can race with signing ("Access to the path is denied"). Retry with
+          # backoff rather than fail on that transient lock.
           $cert = Get-Item "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}"
-          $sig = Set-AuthenticodeSignature -FilePath "pkg_out/Shutter Encoder/Shutter Encoder.exe" -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
-          Write-Host "Signature status: $($sig.Status)"
+          $targetFile = "pkg_out/Shutter Encoder/Shutter Encoder.exe"
+          Set-ItemProperty -Path $targetFile -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
+
+          $maxAttempts = 6
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+              try {
+                  $sig = Set-AuthenticodeSignature -FilePath $targetFile -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -ErrorAction Stop
+                  if ($sig.Status -ne "Valid") { throw "Signature status: $($sig.Status) - $($sig.StatusMessage)" }
+                  Write-Host "Signed OK on attempt $i"
+                  break
+              } catch {
+                  if ($i -eq $maxAttempts) { throw }
+                  Write-Host "Attempt $i failed ($($_.Exception.Message)), retrying in 5s..."
+                  Start-Sleep -Seconds 5
+              }
+          }
 
       - name: jpackage - build EXE installer
         shell: pwsh
@@ -301,9 +318,23 @@ jobs:
         shell: pwsh
         run: |
           $cert = Get-Item "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}"
+          $maxAttempts = 6
+
           Get-ChildItem installer_out/*.exe | ForEach-Object {
-              $sig = Set-AuthenticodeSignature -FilePath $_.FullName -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
-              Write-Host "$($_.Name): $($sig.Status)"
+              $file = $_.FullName
+              Set-ItemProperty -Path $file -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
+              for ($i = 1; $i -le $maxAttempts; $i++) {
+                  try {
+                      $sig = Set-AuthenticodeSignature -FilePath $file -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -ErrorAction Stop
+                      if ($sig.Status -ne "Valid") { throw "Signature status: $($sig.Status) - $($sig.StatusMessage)" }
+                      Write-Host "$($_.Name): signed OK on attempt $i"
+                      break
+                  } catch {
+                      if ($i -eq $maxAttempts) { throw }
+                      Write-Host "$($_.Name): attempt $i failed ($($_.Exception.Message)), retrying in 5s..."
+                      Start-Sleep -Seconds 5
+                  }
+              }
           }
 
       - name: Upload installer artifact
