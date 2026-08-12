@@ -155,6 +155,50 @@ jobs:
               return $found
           }
 
+          # Retry wrappers - GitHub's release/API servers and third-party download hosts
+          # occasionally return transient errors (503s, connection resets) under load.
+          function Get-FileWithRetry($uri, $outFile, $maxAttempts = 5) {
+              for ($i = 1; $i -le $maxAttempts; $i++) {
+                  try {
+                      Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $outFile -ErrorAction Stop
+                      return
+                  } catch {
+                      if ($i -eq $maxAttempts) { throw }
+                      $wait = [Math]::Min(30, 5 * $i)
+                      Write-Host "  download failed ($($_.Exception.Message)), retrying in ${wait}s (attempt $i/$maxAttempts)..."
+                      Start-Sleep -Seconds $wait
+                  }
+              }
+          }
+
+          function Get-JsonWithRetry($uri, $maxAttempts = 5) {
+              for ($i = 1; $i -le $maxAttempts; $i++) {
+                  try {
+                      return Invoke-RestMethod -Uri $uri -ErrorAction Stop
+                  } catch {
+                      if ($i -eq $maxAttempts) { throw }
+                      $wait = [Math]::Min(30, 5 * $i)
+                      Write-Host "  API call failed ($($_.Exception.Message)), retrying in ${wait}s (attempt $i/$maxAttempts)..."
+                      Start-Sleep -Seconds $wait
+                  }
+              }
+          }
+
+          function Invoke-WithRetry([scriptblock]$action, $maxAttempts = 5) {
+              for ($i = 1; $i -le $maxAttempts; $i++) {
+                  try {
+                      & $action
+                      if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "exit code $LASTEXITCODE" }
+                      return
+                  } catch {
+                      if ($i -eq $maxAttempts) { throw }
+                      $wait = [Math]::Min(30, 5 * $i)
+                      Write-Host "  command failed ($($_.Exception.Message)), retrying in ${wait}s (attempt $i/$maxAttempts)..."
+                      Start-Sleep -Seconds $wait
+                  }
+              }
+          }
+
           function Step($label, [scriptblock]$action) {
               Write-Host "==> $label"
               try {
@@ -168,16 +212,16 @@ jobs:
           }
 
           Step "ffmpeg + ffprobe (BtbN)" {
-              Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "dl/ffmpeg.zip"
+              Get-FileWithRetry "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" "dl/ffmpeg.zip"
               $ffmpegExe = Get-ExeFromZip "dl/ffmpeg.zip" "ffmpeg.exe" "dl/ffmpeg"
               Copy-Item $ffmpegExe.FullName Library/ffmpeg.exe
               Copy-Item (Join-Path $ffmpegExe.Directory "ffprobe.exe") Library/ffprobe.exe
           }
 
           Step "7-Zip (ip7z/7zip)" {
-              $sevenZipTag = (Invoke-RestMethod -Uri "https://api.github.com/repos/ip7z/7zip/releases/latest").tag_name
+              $sevenZipTag = (Get-JsonWithRetry "https://api.github.com/repos/ip7z/7zip/releases/latest").tag_name
               $sevenZipVer = $sevenZipTag.Replace(".", "")
-              Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/ip7z/7zip/releases/download/$sevenZipTag/7z$sevenZipVer-extra.7z" -OutFile "dl/7z-extra.7z"
+              Get-FileWithRetry "https://github.com/ip7z/7zip/releases/download/$sevenZipTag/7z$sevenZipVer-extra.7z" "dl/7z-extra.7z"
               New-Item -ItemType Directory -Force -Path "dl/7zextra" | Out-Null
               & $sevenZip x "dl/7z-extra.7z" -o"dl/7zextra" -y | Out-Null
               $sevenZa = Get-ChildItem -Recurse -Path "dl/7zextra" -Filter "7za.exe" | Select-Object -First 1
@@ -191,8 +235,10 @@ jobs:
               # -sS: silent progress meter (its output on stderr can otherwise be treated as a
               # terminating error under PowerShell 7.3+'s $ErrorActionPreference behavior) but
               # still show curl's own error messages on failure.
-              & curl.exe -sS -L --fail -o "dl/exiftool.zip" "https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download"
-              if ($LASTEXITCODE -ne 0) { throw "curl failed downloading ExifTool (exit $LASTEXITCODE)" }
+              Invoke-WithRetry {
+                  & curl.exe -sS -L --fail -o "dl/exiftool.zip" "https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download"
+                  if ($LASTEXITCODE -ne 0) { throw "curl failed downloading ExifTool (exit $LASTEXITCODE)" }
+              }
               Expand-Archive -Path "dl/exiftool.zip" -DestinationPath "dl/exiftool" -Force
               $exifDir = Get-ChildItem -Recurse -Path "dl/exiftool" -Filter "exiftool_files" | Select-Object -First 1
               $exifExe = Get-ChildItem -Recurse -Path "dl/exiftool" -Filter "exiftool*.exe" | Select-Object -First 1
@@ -201,23 +247,23 @@ jobs:
           }
 
           Step "yt-dlp" {
-              Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "Library/yt-dlp.exe"
+              Get-FileWithRetry "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" "Library/yt-dlp.exe"
           }
 
           Step "tsMuxeR (justdan96 fork, frozen 2.7.0)" {
-              Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/justdan96/tsMuxer/releases/download/2.7.0/tsMuxer-2.7.0-win64.zip" -OutFile "dl/tsmuxer.zip"
+              Get-FileWithRetry "https://github.com/justdan96/tsMuxer/releases/download/2.7.0/tsMuxer-2.7.0-win64.zip" "dl/tsmuxer.zip"
               $tsMuxerExe = Get-ExeFromZip "dl/tsmuxer.zip" "tsMuxer.exe" "dl/tsmuxer"
               Copy-Item $tsMuxerExe.FullName Library/tsMuxeR.exe
           }
 
           Step "MediaInfo CLI (pinned 26.05)" {
-              Invoke-WebRequest -UseBasicParsing -Uri "https://mediaarea.net/download/binary/mediainfo/26.05/MediaInfo_CLI_26.05_Windows_x64.zip" -OutFile "dl/mediainfo.zip"
+              Get-FileWithRetry "https://mediaarea.net/download/binary/mediainfo/26.05/MediaInfo_CLI_26.05_Windows_x64.zip" "dl/mediainfo.zip"
               $mediaInfoExe = Get-ExeFromZip "dl/mediainfo.zip" "MediaInfo.exe" "dl/mediainfo"
               Copy-Item $mediaInfoExe.FullName Library/MediaInfo.exe
           }
 
           Step "Xpdf tools (pinned 4.06)" {
-              Invoke-WebRequest -UseBasicParsing -Uri "https://dl.xpdfreader.com/xpdf-tools-win-4.06.zip" -OutFile "dl/xpdf.zip"
+              Get-FileWithRetry "https://dl.xpdfreader.com/xpdf-tools-win-4.06.zip" "dl/xpdf.zip"
               Expand-Archive -Path "dl/xpdf.zip" -DestinationPath "dl/xpdf" -Force
               Get-ChildItem -Recurse -Path "dl/xpdf" -Filter "*.exe" | Where-Object { $_.DirectoryName -like "*bin64*" } | ForEach-Object {
                   Copy-Item $_.FullName "Library/$($_.Name)"
@@ -225,15 +271,15 @@ jobs:
           }
 
           Step "LibRaw dcraw_emu (pinned 0.22.2)" {
-              Invoke-WebRequest -UseBasicParsing -Uri "https://www.libraw.org/data/LibRaw-0.22.2-Win64.zip" -OutFile "dl/libraw.zip"
+              Get-FileWithRetry "https://www.libraw.org/data/LibRaw-0.22.2-Win64.zip" "dl/libraw.zip"
               $dcrawExe = Get-ExeFromZip "dl/libraw.zip" "dcraw_emu.exe" "dl/libraw"
               Copy-Item $dcrawExe.FullName Library/dcraw_emu.exe
           }
 
           Step "bmxtranswrap (bbc/bmx)" {
-              $bmxTag = (Invoke-RestMethod -Uri "https://api.github.com/repos/bbc/bmx/releases/latest").tag_name
+              $bmxTag = (Get-JsonWithRetry "https://api.github.com/repos/bbc/bmx/releases/latest").tag_name
               $bmxVer = $bmxTag.TrimStart("v")
-              Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/bbc/bmx/releases/download/$bmxTag/bmx-win64-binary-$bmxVer.zip" -OutFile "dl/bmx.zip"
+              Get-FileWithRetry "https://github.com/bbc/bmx/releases/download/$bmxTag/bmx-win64-binary-$bmxVer.zip" "dl/bmx.zip"
               $bmxExe = Get-ExeFromZip "dl/bmx.zip" "bmxtranswrap.exe" "dl/bmx"
               Copy-Item $bmxExe.FullName Library/bmxtranswrap.exe
           }
