@@ -331,11 +331,16 @@ jobs:
           Set-ItemProperty -Path $targetFile -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
 
           $maxAttempts = 6
+          # Status "UnknownError" (chain terminates in an untrusted root) is EXPECTED for a
+          # self-signed cert - it means signing succeeded but the trust chain isn't (and can't
+          # be) validated, not that anything failed. Only retry on an actual thrown exception
+          # (e.g. the Defender file-lock race) or a status that means signing never applied.
+          $acceptableStatuses = @("Valid", "UnknownError")
           for ($i = 1; $i -le $maxAttempts; $i++) {
               try {
                   $sig = Set-AuthenticodeSignature -FilePath $targetFile -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -ErrorAction Stop
-                  if ($sig.Status -ne "Valid") { throw "Signature status: $($sig.Status) - $($sig.StatusMessage)" }
-                  Write-Host "Signed OK on attempt $i"
+                  if ($acceptableStatuses -notcontains $sig.Status) { throw "Signature status: $($sig.Status) - $($sig.StatusMessage)" }
+                  Write-Host "Signed OK on attempt $i (status: $($sig.Status))"
                   break
               } catch {
                   if ($i -eq $maxAttempts) { throw }
@@ -365,6 +370,8 @@ jobs:
         run: |
           $cert = Get-Item "Cert:\CurrentUser\My\${{ steps.cert.outputs.thumbprint }}"
           $maxAttempts = 6
+          # See the app-exe signing step for why "UnknownError" is an accepted status here.
+          $acceptableStatuses = @("Valid", "UnknownError")
 
           Get-ChildItem installer_out/*.exe | ForEach-Object {
               $file = $_.FullName
@@ -372,8 +379,8 @@ jobs:
               for ($i = 1; $i -le $maxAttempts; $i++) {
                   try {
                       $sig = Set-AuthenticodeSignature -FilePath $file -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -ErrorAction Stop
-                      if ($sig.Status -ne "Valid") { throw "Signature status: $($sig.Status) - $($sig.StatusMessage)" }
-                      Write-Host "$($_.Name): signed OK on attempt $i"
+                      if ($acceptableStatuses -notcontains $sig.Status) { throw "Signature status: $($sig.Status) - $($sig.StatusMessage)" }
+                      Write-Host "$($_.Name): signed OK on attempt $i (status: $($sig.Status))"
                       break
                   } catch {
                       if ($i -eq $maxAttempts) { throw }
