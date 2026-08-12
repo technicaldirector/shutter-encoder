@@ -1,0 +1,10 @@
+# Local build output (compiled .class files)
+/classes/
+
+# Third-party binaries downloaded into Library/ per README (see Library/sources.txt)
+# — not part of the source tree, shouldn't be committed
+/Library/*.exe
+/Library/*.dll
+/Library/ffmpeg
+/Library/ffprobe
+*.ico

@@ -947,8 +947,34 @@ public class FunctionUtils extends Shutter {
         return sb.toString().substring(0, 10);
     }
 	
-	public static String setLoop(String extension) {	
-		
+	//ffmpeg's atempo filter only accepts a factor in [0.5, 2.0] per instance, so extreme speeds need to be chained
+	public static String buildAtempoChain(double speed) {
+
+		if (speed <= 0)
+			speed = 1.0;
+
+		StringBuilder chain = new StringBuilder();
+		double remaining = speed;
+
+		while (remaining > 2.0)
+		{
+			chain.append("atempo=2.0,");
+			remaining /= 2.0;
+		}
+
+		while (remaining < 0.5)
+		{
+			chain.append("atempo=0.5,");
+			remaining /= 0.5;
+		}
+
+		chain.append("atempo=").append(remaining);
+
+		return chain.toString();
+	}
+
+	public static String setLoop(String extension) {
+
 		if (caseEnableSequence.isSelected() == false)
 		{
 			switch (extension)
@@ -1122,7 +1148,7 @@ public class FunctionUtils extends Shutter {
 		switch (comboFonctions.getSelectedItem().toString())
 		{
 			case "H.264":
-				
+
 				if (caseStream.isSelected())
 				{
 					if (caseLoop.isSelected())						

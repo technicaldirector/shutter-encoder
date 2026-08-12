@@ -22,6 +22,7 @@ package shutterencoder.functions.settings;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import shutterencoder.functions.utils.FunctionUtils;
 import shutterencoder.library.FFPROBE;
 import shutterencoder.ui.main.Shutter;
 import shutterencoder.ui.videoplayer.VideoPlayerCore;
@@ -97,19 +98,24 @@ public class InputAndOutput extends Shutter {
 		int i = 0;
 		for (i = 0 ; i < VideoPlayerMultiCuts.cutSegments.size() ; i++)
     	{
+			CutSegment seg = VideoPlayerMultiCuts.cutSegments.get(i);
+
 			//Video segment
 			if (FFPROBE.audioOnly == false)
 			{
 				String videoIndex = i > 0 ? "[" + i + ":v]" : ""; //first [0:v] is already added from FilterComplex.setFilterComplex()
-				segments += videoIndex + "setpts=PTS-STARTPTS[v" + i + "];";
+				String ptsExpr = seg.speed == 1.0 ? "PTS-STARTPTS" : "(1.0/" + seg.speed + ")*(PTS-STARTPTS)";
+				segments += videoIndex + "setpts=" + ptsExpr + "[v" + i + "];";
 			}
-			
+
 			//Audio segment
 			if (FFPROBE.hasAudio)
 			{
+				String atempo = seg.speed == 1.0 ? "" : FunctionUtils.buildAtempoChain(seg.speed) + ",";
+
 				for (int c = 0 ; c < FFPROBE.channels ; c++)
 				{
-					segments += "[" + i + ":a:" + c + "]asetpts=PTS-STARTPTS[a" + i + "_c" + c + "];";
+					segments += "[" + i + ":a:" + c + "]" + atempo + "asetpts=PTS-STARTPTS[a" + i + "_c" + c + "];";
 				}
 			}
     	}

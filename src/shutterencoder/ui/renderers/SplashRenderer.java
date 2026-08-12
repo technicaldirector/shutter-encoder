@@ -64,11 +64,20 @@ public class SplashRenderer extends JWindow {
 	public void paint(Graphics g) {
 		
 		// Create a BufferedImage with Alpha support if it doesn't exist
+	    if (getWidth() <= 0 || getHeight() <= 0) {
+	        //Peer not sized yet (can happen with some native launchers) - skip this frame, the next repaint will retry
+	        return;
+	    }
+
 	    if (bufferImage == null || bufferImage.getWidth(this) != getWidth() || bufferImage.getHeight(this) != getHeight()) {
 	        bufferImage = new java.awt.image.BufferedImage(getWidth(), getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
 	        bufferGraphics = (Graphics2D) bufferImage.getGraphics();
 	    }
-	    
+
+	    if (bufferGraphics == null) {
+	        return;
+	    }
+
 	    // Set renderingHint
 	    try { //Might fail and block the startup
 		    bufferGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

@@ -45,8 +45,13 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 	    public int outM;
 	    public int outS;
 	    public int outF;
-	   
+	    public double speed = 1.0;
+
 	    public CutSegment(int index, int inMark, int outMark, int inH, int inM, int inS, int inF, int outH, int outM, int outS, int outF) {
+	    	this(index, inMark, outMark, inH, inM, inS, inF, outH, outM, outS, outF, 1.0);
+	    }
+
+	    public CutSegment(int index, int inMark, int outMark, int inH, int inM, int inS, int inF, int outH, int outM, int outS, int outF, double speed) {
 	    	this.index = index;
 	    	this.inMark = inMark;
 	        this.outMark = outMark;
@@ -57,7 +62,8 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 	        this.outH = outH;
 	        this.outM = outM;
 	        this.outS = outS;
-	        this.outF = outF;	        
+	        this.outF = outF;
+	        this.speed = speed;
 	    }
 	}
 
@@ -81,7 +87,8 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 		    {	
 	        	caseApplyCutToAll.setEnabled(false);
 	        	boolean newSegment = false;
-	
+	        	double splitSpeed = 1.0;
+
 				if (activeSegmentIndex != - 1)
 				{
 					//Increment segments after activeSegmentIndex
@@ -89,9 +96,12 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 			        {
 			        	cutSegments.get(i).index += 1;
 			        }
-	
-					cutSegments.remove(activeSegmentIndex);				
-					newSegment = true;			
+
+					//Both halves of the split should inherit the speed of the segment being split, not reset to 1.0
+					splitSpeed = cutSegments.get(activeSegmentIndex).speed;
+
+					cutSegments.remove(activeSegmentIndex);
+					newSegment = true;
 				}
 				
 				//Saving mark out
@@ -117,7 +127,8 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 		        		Integer.parseInt(caseOutH.getText()),
 		        		Integer.parseInt(caseOutM.getText()),
 		        		Integer.parseInt(caseOutS.getText()),
-		        		Integer.parseInt(caseOutF.getText())));
+		        		Integer.parseInt(caseOutF.getText()),
+		        		splitSpeed));
 				
 				//Set saved mark out for the next segment
 				caseOutH.setText(outH);
@@ -142,7 +153,8 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 		        		Integer.parseInt(caseOutH.getText()),
 		        		Integer.parseInt(caseOutM.getText()),
 		        		Integer.parseInt(caseOutS.getText()),
-		        		Integer.parseInt(caseOutF.getText())));        
+		        		Integer.parseInt(caseOutF.getText()),
+		        		splitSpeed));
 		        
 		        if (newSegment)
 		        	activeSegmentIndex += 1;
@@ -158,72 +170,62 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 		}
     }
 		
+	public static void clearSelection() {
+		selectedSegmentIndices.clear();
+		activeSegmentIndex = -1;
+	}
+
 	public static void removeCurrentSegment() {
-		
-		if (cutSegments.isEmpty() == false && activeSegmentIndex != - 1)
+
+		//Segments targeted for removal: explicit multi-selection wins, otherwise fall back to the single active segment
+		java.util.Set<Integer> toRemove = selectedSegmentIndices.isEmpty() == false
+			? new java.util.LinkedHashSet<>(selectedSegmentIndices)
+			: (activeSegmentIndex != -1 ? java.util.Collections.singleton(activeSegmentIndex) : java.util.Collections.emptySet());
+
+		if (cutSegments.isEmpty() == false && toRemove.isEmpty() == false)
 		{
 			saveCutState();
-			
-	        for (int i = 0 ; i < cutSegments.size() ; i++)
-	        {
-	        	if (cutSegments.get(i).index == activeSegmentIndex) //Remove current index
-	        	{
-	        		cutSegments.remove(i);
-	        	}
-	        }
-			
-			//Decrement segments after remove
-			for (CutSegment seg : cutSegments)
+
+			cutSegments.removeIf(seg -> toRemove.contains(seg.index));
+
+			//Re-derive index purely from sorted position so arbitrary multi-deletes stay consistent
+			cutSegments.sort((s1, s2) -> Integer.compare(s1.inMark, s2.inMark));
+			for (int i = 0 ; i < cutSegments.size() ; i++)
 			{
-				if (seg.index > activeSegmentIndex)
-	        	{        		
-	        		seg.index -= 1;
-	        	}
+				cutSegments.get(i).index = i;
 			}
-			
+
 			//Set the correct values then clear all
 			if (cutSegments.size() == 1)
 			{
 				CutSegment seg = cutSegments.get(0);
-				
+
 				playerMarkIn = seg.inMark;
 				playerMarkOut = seg.outMark;
-				
+
 				caseInH.setText(Shutter.formatter.format(seg.inH));
             	caseInM.setText(Shutter.formatter.format(seg.inM));
             	caseInS.setText(Shutter.formatter.format(seg.inS));
             	caseInF.setText(Shutter.formatter.format(seg.inF));
-            	
+
             	caseOutH.setText(Shutter.formatter.format(seg.outH));
             	caseOutM.setText(Shutter.formatter.format(seg.outM));
             	caseOutS.setText(Shutter.formatter.format(seg.outS));
             	caseOutF.setText(Shutter.formatter.format(seg.outF));
-				
-				cutSegments.clear();
-				
-				caseApplyCutToAll.setEnabled(true);
+
+				//Only collapse back to simple in/out mode if there's no custom speed on it to lose
+				if (seg.speed == 1.0)
+				{
+					cutSegments.clear();
+					caseApplyCutToAll.setEnabled(true);
+				}
 			}
-			
-			if (activeSegmentIndex + 1 <= cutSegments.size())
-			{
-				//Do nothing keep the current index value
-			}
-			else if (activeSegmentIndex - 1 > 0)
-			{
-				activeSegmentIndex --;
-			}
-			else
-				activeSegmentIndex = -1;
-				
+
+			clearSelection();
+
 			//FileList
 			VideoPlayerUtils.setFileList();
-			
-			//Display current segment in/out						
-			if (cutSegments.isEmpty() == false)
-	    	{
-	    		setCurrentSegmentValues();
-	    	}
-			
+
 			waveformContainer.repaint();
 		}
 	}
@@ -246,7 +248,9 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
             	caseOutH.setText(Shutter.formatter.format(seg.outH));
             	caseOutM.setText(Shutter.formatter.format(seg.outM));
             	caseOutS.setText(Shutter.formatter.format(seg.outS));
-            	caseOutF.setText(Shutter.formatter.format(seg.outF));            	
+            	caseOutF.setText(Shutter.formatter.format(seg.outF));
+
+            	VideoPlayerUI.syncSpeedCombo(seg.speed);
             }
         }
 	}
@@ -265,7 +269,8 @@ public class VideoPlayerMultiCuts extends VideoPlayerCore {
 	    {
 	        copy.add(new CutSegment(seg.index, seg.inMark, seg.outMark,
 	            seg.inH, seg.inM, seg.inS, seg.inF,
-	            seg.outH, seg.outM, seg.outS, seg.outF
+	            seg.outH, seg.outM, seg.outS, seg.outF,
+	            seg.speed
 	        ));
 	    }
 	    

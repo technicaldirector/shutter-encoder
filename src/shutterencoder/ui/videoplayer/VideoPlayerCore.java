@@ -105,6 +105,7 @@ public class VideoPlayerCore extends VideoPlayerUI {
     private static final Object lock = new Object();
     public static int activeSegmentIndex = -1;
     public static int dragSegmentIndex = -1;
+    public static java.util.Set<Integer> selectedSegmentIndices = new java.util.LinkedHashSet<>();
         
     private static long lastEvTime = 0;
     private static String freezeFrame = "";

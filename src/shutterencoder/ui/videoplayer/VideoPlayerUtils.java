@@ -99,9 +99,9 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 							}
 									
 							//Clear the segment list
-							VideoPlayerCore.activeSegmentIndex = -1;
+							VideoPlayerMultiCuts.clearSelection();
 							if (VideoPlayerMultiCuts.cutSegments.isEmpty() == false)
-							{					
+							{
 								VideoPlayerMultiCuts.clearCutHistory();
 								VideoPlayerMultiCuts.cutSegments.clear();
 							}
@@ -664,42 +664,45 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 						if (s.length > 3)
 						{
 							caseApplyCutToAll.setEnabled(false);
-							
+
 							int index = 0;
-							for (int i = 0 ; i < s.length - 1 ; i += 2)
+							for (int i = 1 ; i + 1 < s.length ; i += 3)
 							{
-								in = s[i+1].split(":");
-								out = s[i+2].split(":");
-								
+								in = s[i].split(":");
+								out = s[i+1].split(":");
+								double speed = (i + 2 < s.length) ? Double.parseDouble(s[i+2]) : 1.0;
+
 								playerMarkIn = VideoPlayerUtils.calculateMarkPosition(
-							        Integer.parseInt(in[0]), 
-							        Integer.parseInt(in[1]), 
-							        Integer.parseInt(in[2]), 
+							        Integer.parseInt(in[0]),
+							        Integer.parseInt(in[1]),
+							        Integer.parseInt(in[2]),
 							        Integer.parseInt(in[3])
 							    );
-								
+
 								playerMarkOut = VideoPlayerUtils.calculateMarkPosition(
-							        Integer.parseInt(out[0]), 
-							        Integer.parseInt(out[1]), 
-							        Integer.parseInt(out[2]), 
+							        Integer.parseInt(out[0]),
+							        Integer.parseInt(out[1]),
+							        Integer.parseInt(out[2]),
 							        Integer.parseInt(out[3])
 							    );
-								
+
 								VideoPlayerMultiCuts.cutSegments.add(new CutSegment(index, playerMarkIn, playerMarkOut,
-										Integer.parseInt(in[0]), 
-								        Integer.parseInt(in[1]), 
-								        Integer.parseInt(in[2]), 
+										Integer.parseInt(in[0]),
+								        Integer.parseInt(in[1]),
+								        Integer.parseInt(in[2]),
 								        Integer.parseInt(in[3]),
-								        Integer.parseInt(out[0]), 
-								        Integer.parseInt(out[1]), 
-								        Integer.parseInt(out[2]), 
-								        Integer.parseInt(out[3])));
-								
+								        Integer.parseInt(out[0]),
+								        Integer.parseInt(out[1]),
+								        Integer.parseInt(out[2]),
+								        Integer.parseInt(out[3]),
+								        speed));
+
 								index ++;
 							}
-							
-							VideoPlayerCore.activeSegmentIndex = 0;							
-							
+
+							VideoPlayerCore.selectedSegmentIndices.clear();
+							VideoPlayerCore.activeSegmentIndex = 0;
+
 							waveformContainer.repaint();
 						}
 					
@@ -754,7 +757,7 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 	        	{
 	        		timeIn = String.format("%02d:%02d:%02d:%02d", seg.inH, seg.inM, seg.inS, seg.inF);
 	    	        timeOut = String.format("%02d:%02d:%02d:%02d", seg.outH, seg.outM, seg.outS, seg.outF);
-	        		newEntry += "|" + timeIn + "|" + timeOut;
+	        		newEntry += "|" + timeIn + "|" + timeOut + "|" + seg.speed;
 	        	}
 	        	
 	        	newEntry += System.lineSeparator();
