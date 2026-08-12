@@ -219,26 +219,26 @@ jobs:
               }
           }
 
-          Step "ffmpeg + ffprobe (gyan.dev release-full)" {
-              # gyan.dev's "release" builds are cut less aggressively than BtbN's bleeding-edge
-              # tag below and are what most Windows ffmpeg users (including this project's own
-              # dev machine) already run successfully with NVENC - using it as the default.
-              Get-FileWithRetry "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z" "dl/ffmpeg.7z"
-              $ffmpegExe = Get-ExeFrom7z "dl/ffmpeg.7z" "ffmpeg.exe" "dl/ffmpeg"
+          Step "ffmpeg + ffprobe (BtbN)" {
+              # BtbN/FFmpeg-Builds "master-latest" tag: tracks git master, rebuilt continuously,
+              # so it always has the newest ffmpeg features/codec fixes. Note: this can run
+              # ahead of some people's installed NVIDIA drivers on the NVENC SDK version it
+              # requires (seen once as "Driver does not support the required nvenc API version"
+              # against a GTX 1070) - if that happens, point the app at a different ffmpeg via
+              # Settings -> custom ffmpeg path instead of downgrading the bundled one, or swap
+              # to gyan.dev's more conservative "release" build below.
+              Get-FileWithRetry "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" "dl/ffmpeg.zip"
+              $ffmpegExe = Get-ExeFromZip "dl/ffmpeg.zip" "ffmpeg.exe" "dl/ffmpeg"
               Copy-Item $ffmpegExe.FullName Library/ffmpeg.exe
               Copy-Item (Join-Path $ffmpegExe.Directory "ffprobe.exe") Library/ffprobe.exe
 
-              # --- Alternative source: BtbN/FFmpeg-Builds "master-latest" tag ---
-              # Tracks git master, rebuilt continuously, so it has the newest features/codec
-              # fixes fastest. Downside: it had bumped its NVENC SDK requirement ahead of most
-              # people's installed NVIDIA drivers (confirmed: "Driver does not support the
-              # required nvenc API version. Required: 13.1 Found: 13.0" against a real GTX 1070
-              # with current drivers), breaking NVENC hardware acceleration for most users. Swap
-              # back to this if BtbN's requirement drops again, or if bleeding-edge codec support
-              # matters more than NVENC compatibility for a given build:
+              # --- Alternative source: gyan.dev's "release-full" build ---
+              # Cut less aggressively than BtbN's bleeding-edge tag above, so it tends to match
+              # more people's installed NVIDIA driver versions for NVENC. Needs 7z instead of
+              # zip extraction (Get-ExeFrom7z, defined above):
               #
-              # Get-FileWithRetry "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" "dl/ffmpeg.zip"
-              # $ffmpegExe = Get-ExeFromZip "dl/ffmpeg.zip" "ffmpeg.exe" "dl/ffmpeg"
+              # Get-FileWithRetry "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z" "dl/ffmpeg.7z"
+              # $ffmpegExe = Get-ExeFrom7z "dl/ffmpeg.7z" "ffmpeg.exe" "dl/ffmpeg"
               # Copy-Item $ffmpegExe.FullName Library/ffmpeg.exe
               # Copy-Item (Join-Path $ffmpegExe.Directory "ffprobe.exe") Library/ffprobe.exe
           }
