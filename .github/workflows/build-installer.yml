@@ -51,10 +51,13 @@ jobs:
       - name: Compile Java sources
         shell: pwsh
         run: |
+          # Compile from the app's actual entry point only, with -sourcepath so javac
+          # pulls in every class transitively referenced from it. Do NOT explicitly list
+          # every .java file under src/shutterencoder - that force-compiles PDF.java too,
+          # which references a nonexistent VideoPlayer class (pre-existing dead code, not
+          # reachable from the app's real entry point, so it's never actually needed).
           $classpath = (Get-ChildItem -Path src/libs -Filter *.jar | ForEach-Object { $_.FullName }) -join ";"
-          $sources = Get-ChildItem -Path src/shutterencoder -Recurse -Filter *.java | ForEach-Object { $_.FullName }
-          $sources | Set-Content sources.txt
-          javac -encoding UTF-8 -nowarn -Xlint:none -cp "$classpath" -d classes "@sources.txt"
+          javac -encoding UTF-8 -nowarn -Xlint:none -cp "$classpath" -d classes -sourcepath src src/shutterencoder/ui/main/Shutter.java
 
       - name: Build main jar
         shell: pwsh
