@@ -184,6 +184,21 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 							Shutter.fileList.repaint();							
 							fileDuration = FFPROBE.totalLength; //Avoid a bug when totalLength is loader somewhere else
 	
+							boolean isWindows = System.getProperty("os.name").contains("Windows");
+							
+							if (FFPROBE.videoCodec != null && FFPROBE.totalLength > 40)
+							{
+								String vcodec = FFPROBE.videoCodec.toLowerCase();				
+								if (vcodec.equals("hevc")
+								|| (vcodec.equals("vp9") && FFPROBE.hasAlpha == false && isWindows)
+								|| (vcodec.equals("av1") && isWindows))
+								{
+									gpuDecodingIsFaster = true;
+								}
+								else
+									gpuDecodingIsFaster = false;
+							}
+							
 							if (isRaw)
 							{
 								Shutter.btnStart.setEnabled(true);
@@ -214,33 +229,36 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 								player.add(Shutter.selection);
 								player.add(Shutter.overImage);
 							}
-							
+														
+							//Get GOP size
 							seekOnKeyFrames = false;
+							if (FFPROBE.audioOnly == false)
+							{							
+								FFPROBE.AnalyzeGOP(VideoPlayerCore.videoPath, false);
+								do {
+									//Slow down the loop
+									try {
+										Thread.sleep(1);
+									} catch (InterruptedException e) {}
+									
+									if (FFPROBE.gopCount > 2)
+									{										
+										FFPROBE.process.destroyForcibly();
+										break;
+									}
+								} while (FFPROBE.processGOP.isAlive());								
+							}
 							
+							//Jump on key frames only
 							if (FFPROBE.audioOnly == false
 							&& (Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionCut"))
 							|| Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionRewrap"))
 							|| Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionConform"))))
 							{
-								FFPROBE.AnalyzeGOP(VideoPlayerCore.videoPath, false);
-								do {
-									try {
-										Thread.sleep(10);
-									} catch (InterruptedException e) {}
-									
-									if (FFPROBE.gopCount > 2)
-									{
-										seekOnKeyFrames = true;
-										FFPROBE.process.destroy();
-										break;
-									}
-								} while (FFPROBE.isRunning);	
-							}
-							else
-							{
-								Shutter.caseEnableCrop.setEnabled(true);
-								Shutter.caseAddWatermark.setEnabled(true);
-								Shutter.caseSafeArea.setEnabled(true);
+								if (FFPROBE.gopCount > 2)
+								{
+									seekOnKeyFrames = true;
+								}
 							}
 							
 							//Autocrop
@@ -269,13 +287,13 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 								|| Shutter.comboSubsSource.getSelectedIndex() != 0)
 								{
 									FunctionUtils.addSubtitles(false);
-									if (VideoPlayerCore.runProcess != null)
+									if (VideoPlayerCore.loadImageProcess != null)
 									{
 										do {
 											try {
 												Thread.sleep(100);
 											} catch (InterruptedException e) {}
-										} while (VideoPlayerCore.runProcess.isAlive());
+										} while (VideoPlayerCore.loadImageProcess.isAlive());
 									}
 									FunctionUtils.addSubtitles(true);
 								}
@@ -873,8 +891,6 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 		}
 		
 		VideoPlayerCore.playerSetTime(VideoPlayerCore.playerCurrentFrame);
-		
-		waveformContainer.repaint();
 	
 		//FileList
 		setFileList();
@@ -930,8 +946,6 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 		}
 	
 		VideoPlayerCore.playerSetTime(VideoPlayerCore.playerCurrentFrame);
-		
-		waveformContainer.repaint();
 	
 		//FileList
 		setFileList();
@@ -1053,10 +1067,7 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 			VideoPlayerCore.playerSetTime(totalFrames);
 			sliderChange = false;    		
 		}
-		
-		if (caseInternalTc.isSelected())
-			inputTime += offset;
-		
+				
 		if (VideoPlayerCore.playerVideo != null && inputTime - offset < totalFrames)
 		{    	    		
 			if (waveformContainer.getCursor().equals(Cursor.getPredefinedCursor(Cursor.W_RESIZE_CURSOR)) && mouseIsPressed)
@@ -1072,12 +1083,15 @@ public class VideoPlayerUtils extends VideoPlayerCore {
 			//NTSC framerate
 			double time = Timecode.setNTSCtimecode(inputTime);
 			
+			if (caseInternalTc.isSelected())
+				time += offset;
+			
 			int newValue = (int) Math.floor((double) (waveformContainer.getSize().width * (time - offset)) / totalFrames);
 			 		
 			String dropFrame = ":";
 			if (Timecode.isDropFrame())
 			{
-				time = Timecode.setDropFrameTimecode(time);				
+				time = Timecode.setDropFrameTimecode(time);		
 				dropFrame = ";";
 			}
 			

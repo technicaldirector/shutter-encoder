@@ -81,7 +81,7 @@ public static int previousImageWidth;
 public static int previousImageHeight;
 public static int imageWidth;
 public static int imageHeight;
-public static float imageRatio = 1.777777f;
+public static float imageRatio = 1.777778f;
 public static int cropPixelsWidth;
 public static int cropPixelsHeight;
 public static String dropFrameTC = "";
@@ -591,23 +591,19 @@ public static String colorprimaries = "";
 
 			        	 	//Timecode
 				            if (line.contains("timecode") && line.contains("timecode is invalid") == false && line.contains("Input") == false) //Avoid "timecode" in the filename
-				            {		
-				            	//Drop frame / non drop frame
-				            	if (line.contains(";"))
-				            	{
-				            		dropFrameTC = ";";
-				            	}
-				            	else
-				            		dropFrameTC = ":";
+				            {						            	
+				            	Matcher matcher = Pattern
+				                        .compile("\\b(\\d{2}):(\\d{2}):(\\d{2})([:;])(\\d{2})\\b")
+				                        .matcher(line);
 
-				            	if (FFPROBE.timecode1 == "")
-				                {			            					            			
-			            			String str[] = line.replace(" ", "").replace(";" , ":").split(":");
-			            			
-				                	timecode1 = str[1];
-				                	timecode2 = str[2];
-				                	timecode3 = str[3];
-				                	timecode4 = str[4];					                	
+				                if (matcher.find() && FFPROBE.timecode1.isEmpty())
+				                {
+				                    timecode1 = matcher.group(1);
+				                    timecode2 = matcher.group(2);
+				                    timecode3 = matcher.group(3);
+				                    timecode4 = matcher.group(5);
+
+				                    dropFrameTC = matcher.group(4); //Drop frame / non drop frame
 				                }
 				            }
 				            
@@ -615,7 +611,7 @@ public static String colorprimaries = "";
 			                if (line.contains("creation_time") && creationTime.equals(""))
 			                {
 			                	//Example   : 2021-05-20T09:55:22.000000Z
-			                	String s[] =  line.substring(line.indexOf(":") + 1).replace(" ", "").replace("T", " ").split("\\.");
+			                	String s[] = line.substring(line.indexOf(":") + 1).replace(" ", "").replace("T", " ").split("\\.");
 			                	
 			                	creationTime = s[0];
 			                }
@@ -912,6 +908,7 @@ public static String colorprimaries = "";
 		gopSpace = 124;
 				
 		processGOP = new Thread(new Runnable()  {
+			
 			@Override
 			public void run() {
 				try {		
@@ -955,13 +952,13 @@ public static String colorprimaries = "";
 						
 						line = br.readLine();
 						
-						Console.consoleFFPROBE.append(line + System.lineSeparator());
+						//Console.consoleFFPROBE.append(line + System.lineSeparator());
 					
-						 if (line == null || intra == 2 || i > 10000 || gopCount > 500)
+						 if (line == null || intra == 2 || i > 20000 || gopCount > 500)
 						 {
 							isRunning = false;
 				            process.destroy();
-				            if ((i > 10000 || gopCount > 500) && isGOPWindow)
+				            if ((i > 20000 || gopCount > 500) && isGOPWindow)
 				            {
 				            	GOP.frame.dispose();
 				            	JOptionPane.showMessageDialog(frame, Shutter.language.getProperty("cantAnalyzeGop"), Shutter.language.getProperty("analyzeError"), JOptionPane.ERROR_MESSAGE);			
@@ -999,8 +996,9 @@ public static String colorprimaries = "";
 							    gopSpace += 112;
 							    gopCount += 1;
 							 }						   				    
-							 i ++;  
+							 i++;  
 						 }
+						 
 					} while(line != null);	
 					
 					process.wait();
@@ -1165,11 +1163,11 @@ public static String colorprimaries = "";
 	
 	public static void setLength() {
 
-		frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-		
 		if (Utils.loadEncFile != null && Utils.loadEncFile.isAlive() || processSetLength != null && processSetLength.isAlive())
 			return;
 		
+		frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
 		processSetLength = new Thread(new Runnable()  {
 			
 			@Override

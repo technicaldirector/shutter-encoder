@@ -58,6 +58,7 @@ import com.formdev.flatlaf.util.SystemFileChooser;
 
 import shutterencoder.functions.Transcribe;
 import shutterencoder.functions.settings.Corrections;
+import shutterencoder.functions.settings.InputAndOutput;
 import shutterencoder.library.EXIFTOOL;
 import shutterencoder.library.FFMPEG;
 import shutterencoder.library.FFPROBE;
@@ -171,8 +172,11 @@ public class FunctionUtils extends Shutter {
 				gpu.start();
 								
 			}
-			else
+			else if (Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionRewrap")) == false
+					&& Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionCut")) == false)
+			{
 				LibraryUtils.checkGPUCapabilities(file.toString());
+			}
 					
 			//Check with MEDIAINFO
 			if (FFPROBE.timecode1 == "" || FFPROBE.interlaced == null)
@@ -1189,6 +1193,10 @@ public class FunctionUtils extends Shutter {
 			}
 			
 			metadata += " -movflags use_metadata_tags";
+		}
+		else if (InputAndOutput.segments != "")
+		{
+			metadata += " -map_chapters -1"; //Allows to output the correct file duration
 		}
 
 		return metadata;

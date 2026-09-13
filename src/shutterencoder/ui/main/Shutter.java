@@ -204,7 +204,7 @@ public class Shutter {
 	/*
 	 * Initialisation
 	 */
-	public static String actualVersion = "20.2";
+	public static String actualVersion = "20.3";
 	public static String getLanguage = "";
 	public static String arch = "x86_64";
 	public static long availableMemory;
@@ -292,7 +292,7 @@ public class Shutter {
 	protected static JComboBox<Object> comboLUTs;
 	protected static JComboBox<Object> comboGamma;
 	protected static JComboBox<Object> comboInLevels;
-	protected static JComboBox<Object> comboOutLevels;
+	public static JComboBox<Object> comboOutLevels;
 	public static JComboBox<Object> comboInColormatrix;
 	protected static JComboBox<Object> comboOutColormatrix;
 	protected static JComboBox<Object> comboColorspace;
@@ -2016,7 +2016,7 @@ public class Shutter {
 					} while (FFPROBE.isRunning);
 				}
 
-				FFMPEG.toSDL(false);
+				FFMPEG.toSDL();
 			}
 		});
 
@@ -3011,6 +3011,7 @@ public class Shutter {
 		});
 
 		iconList = new JLabel(new FlatSVGIcon("resources/list.svg", 15, 15));
+		iconList.setToolTipText(language.getProperty("frameFileDeRendus"));
 		iconList.setHorizontalAlignment(SwingConstants.CENTER);
 		iconList.setVisible(false);
 		iconList.setBounds(180, 46, 21, 21);
@@ -3072,6 +3073,7 @@ public class Shutter {
 		});
 
 		iconPresets = new JLabel(new FlatSVGIcon("resources/presets.svg", 15, 15));
+		iconPresets.setToolTipText(language.getProperty("frameFonctions"));
 		iconPresets.setHorizontalAlignment(SwingConstants.CENTER);
 		iconPresets.setVisible(true);
 		iconPresets.setBounds(180, 45, 21, 21);
@@ -4644,7 +4646,7 @@ public class Shutter {
 		caseLoop.setEnabled(false);
 		caseLoop.setSelected(false);
 		caseLoop.setFont(new Font(mainFont, Font.PLAIN, 12));
-		caseLoop.setBounds(caseStream.getX() + caseStream.getWidth() + 7, -2, caseLoop.getPreferredSize().width, 23);
+		caseLoop.setBounds(caseStream.getX() + caseStream.getWidth() + 7, caseStream.getY(), caseLoop.getPreferredSize().width, 23);
 		destinationStream.add(caseLoop);
 
 		caseStream.addActionListener(new ActionListener() {
@@ -5383,12 +5385,16 @@ public class Shutter {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 
-				if (caseRotate.isSelected()) {
+				if (caseRotate.isSelected())
+				{
 					comboRotate.setEnabled(true);
-				} else
+				}
+				else
 					comboRotate.setEnabled(false);
 
-				VideoPlayerUI.btnStop.doClick(); // Use VideoPlayer.resizeAll and reload the frame
+				VideoPlayerCore.preview = null; //Reload the preview image before rotation
+				
+				VideoPlayerUI.btnStop.doClick(); //Use VideoPlayer.resizeAll and reload the frame
 			}
 
 		});
@@ -5409,8 +5415,10 @@ public class Shutter {
 
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-
-				VideoPlayerUI.btnStop.doClick(); // Use VideoPlayer.resizeAll and reload the frame
+				
+				VideoPlayerCore.preview = null; //Reload the preview image before rotation
+				
+				VideoPlayerUI.btnStop.doClick(); //Use VideoPlayer.resizeAll and reload the frame
 			}
 
 		});
@@ -8483,7 +8491,8 @@ public class Shutter {
 		&& getLanguage.equals(Locale.of("uk").getDisplayLanguage()) == false
 		&& getLanguage.equals(Locale.of("id").getDisplayLanguage()) == false
 		&& getLanguage.equals(Locale.of("ro").getDisplayLanguage()) == false
-		&& getLanguage.equals(Locale.of("fi").getDisplayLanguage()) == false)
+		&& getLanguage.equals(Locale.of("fi").getDisplayLanguage()) == false
+		&& getLanguage.equals(Locale.of("bg").getDisplayLanguage()) == false)
 		{
 			grpAudio.add(lblAudioIs);
 		}
@@ -9940,33 +9949,38 @@ public class Shutter {
 
 					String str = "00:00:00" + dropFrame + "00";
 
-					if (caseAddTimecode.isSelected() || caseShowTimecode.isSelected()) {
-						float tcH = 0;
-						float tcM = 0;
-						float tcS = 0;
-						float tcF = 0;
+					if (caseAddTimecode.isSelected() || caseShowTimecode.isSelected())
+					{
+						double tcH = 0;
+						double tcM = 0;
+						double tcS = 0;
+						double tcF = 0;
 
-						if (caseAddTimecode.isSelected() && TC1.getText().isEmpty() == false
-								&& TC2.getText().isEmpty() == false && TC3.getText().isEmpty() == false
-								&& TC4.getText().isEmpty() == false) {
+						if (caseAddTimecode.isSelected()
+						&& TC1.getText().isEmpty() == false
+						&& TC2.getText().isEmpty() == false && TC3.getText().isEmpty() == false
+						&& TC4.getText().isEmpty() == false)
+						{
 							tcH = Integer.valueOf(TC1.getText());
 							tcM = Integer.valueOf(TC2.getText());
 							tcS = Integer.valueOf(TC3.getText());
 							tcF = Integer.valueOf(TC4.getText());
-						} else if (caseShowTimecode.isSelected() && FFPROBE.timecode1 == "" == false) {
+						}
+						else if (caseShowTimecode.isSelected() && FFPROBE.timecode1 == "" == false)
+						{
 							tcH = Integer.valueOf(FFPROBE.timecode1);
 							tcM = Integer.valueOf(FFPROBE.timecode2);
 							tcS = Integer.valueOf(FFPROBE.timecode3);
-							tcF = Integer.valueOf(FFPROBE.timecode4);
+							tcF = Integer.valueOf(FFPROBE.timecode4);			
 						}
 
-						tcH = (float) (tcH * 3600 * FFPROBE.accurateFPS);
-						tcM = (float) (tcM * 60 * FFPROBE.accurateFPS);
-						tcS = (float) (tcS * FFPROBE.accurateFPS);
+						tcH = (double) (tcH * 3600 * FFPROBE.accurateFPS);
+						tcM = (double) (tcM * 60 * FFPROBE.accurateFPS);
+						tcS = (double) (tcS * FFPROBE.accurateFPS);
 
-						float timeIn = (Integer.parseInt(VideoPlayerUI.caseInH.getText()) * 3600
+						double timeIn = (Integer.parseInt(VideoPlayerUI.caseInH.getText()) * 3600
 								+ Integer.parseInt(VideoPlayerUI.caseInM.getText()) * 60
-								+ Integer.parseInt(VideoPlayerUI.caseInS.getText())) * FFPROBE.currentFPS
+								+ Integer.parseInt(VideoPlayerUI.caseInS.getText())) * VideoPlayerUtils.getFPS()
 								+ Integer.parseInt(VideoPlayerUI.caseInF.getText());
 
 						if (VideoPlayerMultiCuts.cutSegments.isEmpty() == false)
@@ -9975,17 +9989,20 @@ public class Shutter {
 							timeIn = (seg.inH * 3600 + seg.inM * 60 + seg.inS) * FFPROBE.currentFPS + seg.inF;
 						}
 						
-						if (caseShowTimecode.isSelected()) {
+						if (caseShowTimecode.isSelected())
 							timeIn = 0;
-						}
-
-						double currentTime = Timecode.setNTSCtimecode(VideoPlayerCore.bufferedFrames.size() > 0 ?  VideoPlayerCore.bufferCurrentFrame : VideoPlayerCore.playerCurrentFrame);
+						
+						double currentTime = VideoPlayerCore.bufferedFrames.size() > 0 ? VideoPlayerCore.bufferCurrentFrame : VideoPlayerCore.playerCurrentFrame;
+						
+						//NTSC framerate
+						currentTime = Timecode.setNTSCtimecode(currentTime);
+						
 						double offset = (currentTime - timeIn) + tcH + tcM + tcS + tcF;
 
 						if (offset < 0)
 							offset = 0;
 
-						double fps = FFPROBE.accurateFPS;
+						double fps = VideoPlayerUtils.getFPS();
 						if (Timecode.isDropFrame())
 						{
 							offset = Timecode.setDropFrameTimecode(offset);
@@ -11782,7 +11799,13 @@ public class Shutter {
 		else
 			comboSubsSource.setLocation(caseAddSubtitles.getX() + caseAddSubtitles.getWidth(), caseAddSubtitles.getY() + 1);
 		
-		comboSubsSource.setSize(comboSubsSource.getPreferredSize().width + 8, 20);
+		if (getLanguage.equals(Locale.of("bg").getDisplayLanguage()))
+		{
+			comboSubsSource.setSize(comboSubsSource.getPreferredSize().width - 10, 20);
+		}
+		else
+			comboSubsSource.setSize(comboSubsSource.getPreferredSize().width + 8, 20);
+		
 		comboSubsSource.setFont(new Font(Shutter.mainFont, Font.PLAIN, 11));
 		grpSubtitles.add(comboSubsSource);
 		
@@ -11794,13 +11817,13 @@ public class Shutter {
 				if (caseAddSubtitles.isSelected() && VideoPlayerCore.loadMedia.isAlive() == false) //LoadMedia already load the subs
 				{
 					FunctionUtils.addSubtitles(false);
-					if (VideoPlayerCore.runProcess != null)
+					if (VideoPlayerCore.loadImageProcess != null)
 					{
 						do {
 							try {
 								Thread.sleep(100);
 							} catch (InterruptedException e) {}
-						} while (VideoPlayerCore.runProcess.isAlive());
+						} while (VideoPlayerCore.loadImageProcess.isAlive());
 					}
 					FunctionUtils.addSubtitles(true);
 				}
@@ -15509,9 +15532,16 @@ public class Shutter {
 		spinnerVideoFadeIn.setName("spinnerVideoFadeIn");
 		spinnerVideoFadeIn.setEnabled(false);
 		spinnerVideoFadeIn.setFont(new Font(Shutter.mainFont, Font.PLAIN, 11));
-		if (Shutter.getLanguage.equals(Locale.of("en").getDisplayLanguage()))
+		if (getLanguage.equals(Locale.of("en").getDisplayLanguage()))
+		{
 			spinnerVideoFadeIn.setBounds(caseVideoFadeIn.getLocation().x + caseVideoFadeIn.getWidth() + 12,
 					caseVideoFadeIn.getLocation().y + 3, 41, 16);
+		}
+		else if (getLanguage.equals(Locale.of("bg").getDisplayLanguage()))
+		{
+			spinnerVideoFadeIn.setBounds(caseVideoFadeIn.getLocation().x + caseVideoFadeIn.getWidth() + 26,
+					caseVideoFadeIn.getLocation().y + 3, 41, 16);
+		}
 		else
 			spinnerVideoFadeIn.setBounds(caseVideoFadeIn.getLocation().x + caseVideoFadeIn.getWidth() + 6,
 					caseVideoFadeIn.getLocation().y + 3, 41, 16);
@@ -18128,7 +18158,7 @@ public class Shutter {
 							UIController.extendSections(grpSetAudio, 115);
 					} else if ("MPEG-1".equals(comboFonctions.getSelectedItem().toString())
 							|| "MPEG-2".equals(comboFonctions.getSelectedItem().toString())) {
-						comboAudioCodec.setModel(new DefaultComboBoxModel<String>(new String[] { "MP2",
+						comboAudioCodec.setModel(new DefaultComboBoxModel<String>(new String[] { "MP2", "AC3",
 								language.getProperty("codecCopy"), language.getProperty("noAudio"), language.getProperty("custom") }));
 						comboAudioCodec.setSelectedIndex(0);
 						debitAudio.setModel(comboAudioBitrate.getModel());

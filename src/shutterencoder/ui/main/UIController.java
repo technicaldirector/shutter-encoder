@@ -1147,13 +1147,18 @@ public class UIController extends Shutter {
 										VideoPlayerUtils.setMedia();										
 									}
 									
-								} else
+								}
+								else if (FFPROBE.gopCount > 2)
+								{
 									VideoPlayerUI.seekOnKeyFrames = true;
+								}
 
 							} else if (language.getProperty("functionRewrap").equals(function)
 							|| language.getProperty("functionCut").equals(function)
 							|| language.getProperty("functionMerge").equals(function)) {
-								VideoPlayerUI.seekOnKeyFrames = true;
+								
+								if (FFPROBE.gopCount > 2)
+									VideoPlayerUI.seekOnKeyFrames = true;
 
 								if (language.getProperty("functionCut").equals(function)
 										|| language.getProperty("functionMerge").equals(function)) {
@@ -3201,7 +3206,7 @@ public class UIController extends Shutter {
 										comboAudioCodec.setSelectedIndex(0);
 									} else if (comboAudioCodec.getModel().getElementAt(0).equals("MP2") == false
 											&& ("MPEG-1".equals(function) || "MPEG-2".equals(function))) {
-										comboAudioCodec.setModel(new DefaultComboBoxModel<String>(new String[] { "MP2",
+										comboAudioCodec.setModel(new DefaultComboBoxModel<String>(new String[] { "MP2", "AC3",
 												language.getProperty("codecCopy"), language.getProperty("noAudio"), language.getProperty("custom") }));
 										comboAudioCodec.setSelectedIndex(0);
 									} else if (comboAudioCodec.getModel().getElementAt(0).equals("Opus") == false

@@ -62,7 +62,7 @@ public class InputAndOutput extends Shutter {
 									
 				if (timeIn > 0.0f)
 		        {
-					inPoint = " -ss " + (long) ((double) timeIn * VideoPlayerUI.inputFramerateMS + getOffset()) + "ms";
+					inPoint = " -ss " + (long) ((double) timeIn * VideoPlayerUI.inputFramerateMS) + "ms";
 			    }
 				
 				if (VideoPlayerUI.playerMarkOut < VideoPlayerCore.waveformContainer.getWidth() && caseEnableSequence.isSelected() == false)
@@ -81,7 +81,7 @@ public class InputAndOutput extends Shutter {
 			        	outPoint = " -frames:v " + frames;
 		        	}
 		        	else
-		        		outPoint = " -t " + (long) Math.floor((double) frames * ((float) 1000 / FFPROBE.accurateFPS) - getOffset()) + "ms";		        	
+		        		outPoint = " -t " + (long) Math.floor((double) frames * ((float) 1000 / FFPROBE.accurateFPS)) + "ms";		        	
 		        }
 				
 				if (VideoPlayerUI.comboMode.getSelectedItem().toString().equals(language.getProperty("splitMode")))
@@ -218,7 +218,7 @@ public class InputAndOutput extends Shutter {
                 }
                 
                 //Set input point
-                inputFiles += inputHardware + " -ss " + (long) ((double) in * VideoPlayerUI.inputFramerateMS + getOffset()) + "ms";
+                inputFiles += inputHardware + " -ss " + (long) ((double) in * VideoPlayerUI.inputFramerateMS) + "ms";
         				
 				//Set output point
 	        	if ((comboFonctions.getSelectedItem().toString().equals(language.getProperty("functionPicture")) || comboFonctions.getSelectedItem().toString().contains("JPEG")) && caseCreateSequence.isSelected())
@@ -232,7 +232,7 @@ public class InputAndOutput extends Shutter {
 	        		inputFiles += " -frames:v " + total + afterInput;
 	        	}
 	        	else
-	        		inputFiles += " -t " + (long) Math.floor((double) total * ((float) 1000 / FFPROBE.accurateFPS) - getOffset()) + "ms" + afterInput;
+	        		inputFiles += " -t " + (long) Math.floor((double) total * ((float) 1000 / FFPROBE.accurateFPS)) + "ms" + afterInput;
 	        	
 	        	inputFiles += file;
 	        	isFirstInput = false;
@@ -247,17 +247,5 @@ public class InputAndOutput extends Shutter {
 		}
 		else		
 			return beforeInput + file + afterInput;		
-	}
-	
-	private static double getOffset() {	
-		
-		//Add 0.5 frame offset only for stream copy to lock demuxer to target frame
-		if (Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionRewrap"))
-		|| Shutter.comboFonctions.getSelectedItem().toString().equals(Shutter.language.getProperty("functionCut")))
-		{
-			return VideoPlayerUI.inputFramerateMS / 2.0;
-		}
-		
-		return 0.0;
 	}
 }

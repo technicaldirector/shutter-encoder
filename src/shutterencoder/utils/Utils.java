@@ -92,6 +92,7 @@ import shutterencoder.library.DEOLDIFY;
 import shutterencoder.library.DVDAUTHOR;
 import shutterencoder.library.FFMPEG;
 import shutterencoder.library.FFPROBE;
+import shutterencoder.library.LibraryUtils;
 import shutterencoder.library.XPDFREADER;
 import shutterencoder.library.PYTHON;
 import shutterencoder.library.TSMUXER;
@@ -486,7 +487,8 @@ public class Utils extends Shutter {
 				Shutter.boldFont = "";
 				Shutter.mainFont = "";
 			}
-			else if (getLanguage.contains(Locale.of("vi").getDisplayLanguage())
+			else if (getLanguage.contains(Locale.of("bg").getDisplayLanguage())
+			|| getLanguage.contains(Locale.of("vi").getDisplayLanguage())
 			|| getLanguage.contains(Locale.of("pl").getDisplayLanguage())
 			|| getLanguage.contains(Locale.of("ro").getDisplayLanguage())) //use system default font
 			{
@@ -2307,8 +2309,11 @@ public class Utils extends Shutter {
 
 				Thread wait = new Thread(() -> {
 					try {
-						loadEncFile.join();				
-						VideoPlayerCore.playerProcess(0);
+						loadEncFile.join();
+						
+						VideoPlayerCore.playerProcess(0, null);
+						LibraryUtils.checkGPUCapabilities(VideoPlayerCore.videoPath);
+						
 						frame.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
 					} catch (InterruptedException e) {}	
 				});
